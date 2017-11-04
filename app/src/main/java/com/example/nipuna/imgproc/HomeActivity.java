@@ -13,11 +13,20 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ImageView;
 import android.widget.Toast;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.FileNotFoundException;
 import java.io.InputStream;
@@ -28,7 +37,23 @@ public class HomeActivity extends AppCompatActivity {
     private static final int READ_EXTERNAL_STORAGE_REQUEST_CODE = 100;
     private ImageView mImageView;
     private FloatingActionButton fab;
-    private Bitmap originalImage = null;
+    private Bitmap selectedImage = null;
+
+    private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
+        @Override
+        public void onManagerConnected(int status) {
+            switch (status) {
+                case LoaderCallbackInterface.SUCCESS:
+                {
+                    Log.i("OpenCV", "OpenCV loaded successfully");
+                } break;
+                default:
+                {
+                    super.onManagerConnected(status);
+                } break;
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,9 +148,14 @@ public class HomeActivity extends AppCompatActivity {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_original_image) {
-            if (originalImage != null) {
-                mImageView.setImageBitmap(originalImage);
+            if (selectedImage != null) {
+                mImageView.setImageBitmap(selectedImage);
             }
+            else Toast.makeText(this, "No selected Image!", Toast.LENGTH_SHORT).show();
+            return true;
+        }
+        if (id == R.id.action_grayscale_image) {
+            mImageView.setImageBitmap(convertToGrayImage(selectedImage));
             return true;
         }
 
@@ -140,8 +170,11 @@ public class HomeActivity extends AppCompatActivity {
             try {
                 final Uri imageUri = data.getData();
                 final InputStream imageStream = getContentResolver().openInputStream(imageUri);
-                originalImage = BitmapFactory.decodeStream(imageStream);
-                mImageView.setImageBitmap(originalImage);
+                selectedImage = BitmapFactory.decodeStream(imageStream);
+                mImageView.setImageBitmap(selectedImage);
+
+
+
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
                 Toast.makeText(HomeActivity.this, "Something went wrong", Toast.LENGTH_LONG).show();
@@ -149,6 +182,33 @@ public class HomeActivity extends AppCompatActivity {
 
         }else {
             Toast.makeText(HomeActivity.this, "You haven't picked Image", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private Bitmap convertToGrayImage(Bitmap image) {
+        if (image == null) {
+            Toast.makeText(this, "No selected Image!", Toast.LENGTH_SHORT).show();
+            return null;
+        }
+        Bitmap bitmap = Bitmap.createBitmap(image.getWidth(), image.getHeight(), Bitmap.Config.ARGB_8888);
+        Mat originalImage = new Mat();
+        Utils.bitmapToMat(image, originalImage);
+        Mat grayImage = new Mat(originalImage.rows(), originalImage.cols(), CvType.CV_8UC1);
+        Imgproc.cvtColor(originalImage, grayImage, Imgproc.COLOR_RGB2GRAY);
+        Utils.matToBitmap(grayImage, bitmap);
+
+        return bitmap;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!OpenCVLoader.initDebug()) {
+            Log.d("OpenCV", "Internal OpenCV library not found. Using OpenCV Manager for initialization");
+            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_2_0, this, mLoaderCallback);
+        } else {
+            Log.d("OpenCV", "OpenCV library found inside package. Using it!");
+            mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
         }
     }
 }
