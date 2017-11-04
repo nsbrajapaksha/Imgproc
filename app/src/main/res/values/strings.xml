@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Imgproc</string>
+    <string name="action_original_image">Original Image</string>
+    <string name="action_gray_image">GrayScale Image</string>
+</resources>
